@@ -1,5 +1,5 @@
 [package]
-name = "google_photos_backup"
+name = "google_backup_to_s3"
 version = "0.1.0"
 edition = "2021"
 
