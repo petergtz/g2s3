@@ -29,3 +29,4 @@ hex = "0.*"
 base64 = "0.*"
 tokio-util = { version = "0.*", features = ["compat"] }
 error-chain = "0.*"
+clap = { version = "4.*", features = ["derive"] }

@@ -1,39 +1,37 @@
 extern crate core;
-extern crate google_drive3 as google_drive;
 
 use std::io::Write;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
 use aws_config;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
-use aws_sdk_s3::model::StorageClass;
-use aws_smithy_http::body::SdkBody;
-use aws_smithy_http::byte_stream::ByteStream;
+use aws_smithy_http::{body::SdkBody, byte_stream::ByteStream};
 use futures::{stream, StreamExt};
-use google_drive::{DriveHub, hyper, hyper_rustls};
-use google_drive::api::FileList;
-use google_drive::hyper::{Body, Response};
-use google_drive::hyper::client::HttpConnector;
-use google_drive::hyper_rustls::HttpsConnector;
-use google_drive::oauth2;
-use google_drive::oauth2::authorized_user::AuthorizedUserSecret;
+use google_drive3::{api::FileList, DriveHub, hyper, hyper_rustls};
+use google_drive3::{oauth2, oauth2::authorized_user::AuthorizedUserSecret};
+use google_drive3::hyper::{Body, client::HttpConnector, Response};
+use google_drive3::hyper_rustls::HttpsConnector;
 use tokio::sync::mpsc;
 
-use errors::Result;
-use errors::ResultExt;
+use errors::{Result, ResultExt};
 
 pub mod errors;
 
 
-pub async fn back_up(aus: AuthorizedUserSecret, drive_folder_name: &str, bucket_name: &str) -> Result<()> {
+pub async fn back_up(aus: AuthorizedUserSecret,
+                     drive_folder_name: &str,
+                     bucket_name: &str,
+                     folder_in_bucket: &str,
+                     s3_storage_class: &str) -> Result<()> {
     let hub = Arc::new(create_drive_hub(aus).await);
-    // let s3 = Arc::new(aws_sdk_s3::Client::new(
-    //     &aws_config::from_env().region(RegionProviderChain::default_provider())
-    //         .load().await));
     let s3 = Arc::new(aws_sdk_s3::Client::new(
-        &aws_config::from_env().region("eu-west-1").load().await));
+        &aws_config::from_env().region(RegionProviderChain::default_provider())
+            .load().await));
+    // let s3 = Arc::new(aws_sdk_s3::Client::new(
+    //     &aws_config::from_env().region("eu-west-1").load().await));
 
     let files = hub.files().list().
         q(&*format!("name = '{drive_folder_name}' and \
@@ -66,7 +64,12 @@ pub async fn back_up(aus: AuthorizedUserSecret, drive_folder_name: &str, bucket_
             let (hub, s3) = (hub.clone(), s3.clone());
             let tx = tx.clone();
             async move {
-                let result = copy_file(&*hub, &*s3, file.clone(), bucket_name).await;
+                let result = copy_file(
+                    &*hub, &*s3,
+                    file.clone(),
+                    bucket_name,
+                    folder_in_bucket,
+                    s3_storage_class).await;
                 tx.send(result).unwrap();
             }
         },
@@ -128,7 +131,9 @@ pub fn create_aus_from_env_vars() -> Result<AuthorizedUserSecret> {
 async fn copy_file(hub: &DriveHub<HttpsConnector<HttpConnector>>,
                    s3: &Client,
                    file: google_drive3::api::File,
-                   bucket_name: &str) -> Result<()> {
+                   bucket_name: &str,
+                   folder_name: &str,
+                   storage_class: &str) -> Result<()> {
     let filename = file.name.as_ref().unwrap();
     log::info!("Copying file {}", filename);
     let start_time = Instant::now();
@@ -139,10 +144,10 @@ async fn copy_file(hub: &DriveHub<HttpsConnector<HttpConnector>>,
         .await.chain_err(|| format!("Could not download file contents from drive for {filename}."))?.0;
     assert!(file_content.status().is_success());
     let _s3_response = s3.put_object().bucket(bucket_name)
-        .key(filename)
+        .key(Path::new(folder_name).join(filename).to_str().unwrap())
         .content_md5(base64::encode(hex::decode(file.md5_checksum.as_ref().unwrap()).unwrap()))
         .body(ByteStream::new(SdkBody::from(file_content.into_body())))
-        .storage_class(StorageClass::DeepArchive)
+        .storage_class(storage_class.into())
         .send().await.chain_err(|| format!("Could not upload file contents for {filename}"))?;
     log::info!("Throughput for file {} of size {} B: {} B/s",
                 filename,
