@@ -2,6 +2,6 @@
 
 cd $(dirname $0)/..
 
-docker build -t pego/google-backup-to-s3 .
+docker build -t pego/google-backup-to-s3 rust
 
 
