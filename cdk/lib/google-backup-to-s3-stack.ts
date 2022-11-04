@@ -12,19 +12,27 @@ import {CronOptions} from "aws-cdk-lib/aws-events/lib/schedule";
 import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
 import {CfnJobDefinition} from "aws-cdk-lib/aws-batch/lib/batch.generated";
 import SecretProperty = CfnJobDefinition.SecretProperty;
+import {URL} from "url";
+import assert from "assert";
 
 interface Config {
-    s3_backup_bucket: string;
-    should_create_bucket: boolean
     backup_definitions: BackupDefinition[];
     email?: string,
 }
 
 interface BackupDefinition {
-    s3_folder: string;
     google_drive_folder: string;
     google_secrets: SecretProperty[],
+    s3_url: string,
+    should_create_bucket: boolean,
+    storage_class?: string,
     schedule?: CronOptions;
+}
+
+export function bucket_name_from(s3_url: string) {
+    let u = new URL(s3_url);
+    assert(u.protocol == "s3:");
+    return u.hostname;
 }
 
 export class GoogleBackupToS3Stack extends cdk.Stack {
@@ -55,11 +63,17 @@ def handler(event, context): boto3.client("sns").publish(
             });
 
         snsTopic.grantPublish(lambda_to_forward_batch_completion);
-        if (config.should_create_bucket) {
-            new Bucket(this, "backup-bucket", {bucketName: config.s3_backup_bucket});
-        }
+
         const jobQueue = this.createDefaultJobQueue();
+
         for (let backup_def of config.backup_definitions) {
+            if (backup_def.should_create_bucket) {
+                new Bucket(this, "backup-bucket", {bucketName: bucket_name_from(backup_def.s3_url)});
+            }
+            let command = ["/back-up-drive-folder", backup_def.google_drive_folder, backup_def.s3_url];
+            if (backup_def.storage_class) {
+                command.push("--s3-storage-class", backup_def.storage_class)
+            }
             const jobDefinition = new batch.CfnJobDefinition(
                 this,
                 `google-${backup_def.google_drive_folder}-backup-to-s3-job-def`,
@@ -67,8 +81,7 @@ def handler(event, context): boto3.client("sns").publish(
                     type: "container",
                     jobDefinitionName: `google-${backup_def.google_drive_folder}-backup-to-s3`,
                     containerProperties: {
-                        command: ["/back-up-drive-folder",
-                            "--s3-folder", backup_def.s3_folder, backup_def.google_drive_folder, config.s3_backup_bucket],
+                        command: command,
                         image: "pego/google-backup-to-s3:latest",
                         jobRoleArn: "arn:aws:iam::512841817041:role/google-takeout-backup-batch-execution-role",
                         executionRoleArn: "arn:aws:iam::512841817041:role/google-takeout-backup-batch-execution-role",

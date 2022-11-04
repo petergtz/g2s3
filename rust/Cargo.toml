@@ -30,3 +30,8 @@ base64 = "0.*"
 tokio-util = { version = "0.*", features = ["compat"] }
 error-chain = "0.*"
 clap = { version = "4.*", features = ["derive"] }
+url = "2.*"
+#tap = "1.*"
+#phf = "0.*"
+#lazy_static = "1.*"
+byte-unit = "4.*"
