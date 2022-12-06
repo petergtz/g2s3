@@ -1,0 +1,26 @@
+name: Build and package Rust binary
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-release-build-and-push-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Rust
+      uses: ATiltedTree/setup-rust@v1.0.5
+      with:
+        rust-version: stable
+    - name: Build Rust binary
+      run: cd rust && cargo build --release --bin back-up-drive-folder
+
+    - name: Build and publish Docker Images to GitHub Container registry
+      uses: VaultVulp/gp-docker-action@1.5.0
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        image-name: g2s3
+        image-tag: latest
+        build-context: ./rust
