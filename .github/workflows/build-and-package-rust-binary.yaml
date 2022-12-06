@@ -32,3 +32,4 @@ jobs:
         image-name: g2s3
         image-tag: latest
         build-context: ./rust
+        dockerfile: ./rust/Dockerfile
