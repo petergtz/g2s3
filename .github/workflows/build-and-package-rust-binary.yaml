@@ -29,7 +29,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust/target/x86_64-unknown-linux-gnu/release/back-up-drive-folder
+        path: ./rust/target/
 
   build-and-push-docker-image:
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
     - uses: actions/download-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust/target/x86_64-unknown-linux-gnu/release/back-up-drive-folder
+        path: ./rust/target/
 
     - name: Build and publish Docker Images to GitHub Container registry
       uses: VaultVulp/gp-docker-action@1.5.0
