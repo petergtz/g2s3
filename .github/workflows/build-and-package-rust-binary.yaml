@@ -8,7 +8,15 @@ jobs:
   build-release-build-and-push-docker-image:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+    - name: ⚡ Cache
+      uses: actions/cache@v3.0.11
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Set up Rust
       uses: ATiltedTree/setup-rust@v1.0.5
