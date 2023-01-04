@@ -11,9 +11,10 @@ import {Bucket} from "aws-cdk-lib/aws-s3";
 import {CronOptions} from "aws-cdk-lib/aws-events/lib/schedule";
 import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
 import {CfnJobDefinition} from "aws-cdk-lib/aws-batch/lib/batch.generated";
-import SecretProperty = CfnJobDefinition.SecretProperty;
 import {URL} from "url";
 import assert from "assert";
+import * as iam from "aws-cdk-lib/aws-iam";
+import SecretProperty = CfnJobDefinition.SecretProperty;
 
 interface Config {
     backup_definitions: BackupDefinition[];
@@ -65,11 +66,25 @@ def handler(event, context): boto3.client("sns").publish(
         snsTopic.grantPublish(lambda_to_forward_batch_completion);
 
         const jobQueue = this.createDefaultJobQueue();
+        let batchJobRole = new iam.Role(this, "google-takeout-backup-job-role", {
+            assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+        })
+
+        let batchJobExecutionRole = new iam.Role(this, "google-takeout-backup-execution-job-role", {
+            assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+            managedPolicies: [
+                iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite"),
+                iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSBatchServiceRole"),
+            ],
+        });
+
+        for (let [bucketName, shouldCreate] of new Map(config.backup_definitions.map(
+            backup_def => [bucket_name_from(backup_def.s3_url), backup_def.should_create_bucket]))) {
+            (shouldCreate ? new Bucket(this, `backup-bucket-${bucketName}`, {bucketName: bucketName})
+                : Bucket.fromBucketName(this, `backup-bucket-${bucketName}`, bucketName)).grantPut(batchJobRole)
+        }
 
         for (let backup_def of config.backup_definitions) {
-            if (backup_def.should_create_bucket) {
-                new Bucket(this, "backup-bucket", {bucketName: bucket_name_from(backup_def.s3_url)});
-            }
             let command = ["/back-up-drive-folder", backup_def.google_drive_folder, backup_def.s3_url];
             if (backup_def.storage_class) {
                 command.push("--s3-storage-class", backup_def.storage_class)
@@ -83,8 +98,8 @@ def handler(event, context): boto3.client("sns").publish(
                     containerProperties: {
                         command: command,
                         image: "pego/google-backup-to-s3:latest",
-                        jobRoleArn: "arn:aws:iam::512841817041:role/google-takeout-backup-batch-execution-role",
-                        executionRoleArn: "arn:aws:iam::512841817041:role/google-takeout-backup-batch-execution-role",
+                        jobRoleArn: batchJobRole.roleArn,
+                        executionRoleArn: batchJobExecutionRole.roleArn,
                         networkConfiguration: {assignPublicIp: "ENABLED",},
                         resourceRequirements: [
                             {type: "VCPU", value: "1"},
