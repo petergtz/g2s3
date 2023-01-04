@@ -58,8 +58,8 @@ export class GoogleBackupToS3Stack extends cdk.Stack {
 import boto3, json
 def handler(event, context): boto3.client("sns").publish(
     TargetArn="${snsTopic.topicArn}", 
-    Message=json.dumps(event), 
-    Subject="AWS Batch job for backups completed")`),
+    Message=json.dumps(event, sort_keys=True, indent=4), 
+    Subject=f"AWS Batch job {event['detail']['jobName']} {event['detail']['status']}")`),
             });
 
         snsTopic.grantPublish(lambda_to_forward_batch_completion);
