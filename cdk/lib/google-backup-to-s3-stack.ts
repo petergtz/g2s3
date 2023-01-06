@@ -2,17 +2,16 @@ import {aws_events as events, aws_sns as sns, Stack} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {Schedule} from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
-import {BatchJob} from "aws-cdk-lib/aws-events-targets";
 import * as batch from 'aws-cdk-lib/aws-batch';
-import {CfnComputeEnvironment} from 'aws-cdk-lib/aws-batch';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import {Bucket} from "aws-cdk-lib/aws-s3";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import {CronOptions} from "aws-cdk-lib/aws-events/lib/schedule";
 import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
 import {CfnJobDefinition} from "aws-cdk-lib/aws-batch/lib/batch.generated";
 import {URL} from "url";
 import assert from "assert";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import SecretProperty = CfnJobDefinition.SecretProperty;
 
 interface Config {
@@ -70,8 +69,8 @@ def handler(event, context): boto3.client("sns").publish(
 
     for (let [bucketName, shouldCreate] of new Map(config.backup_definitions.map(
         backup_def => [bucket_name_from(backup_def.s3_url), backup_def.should_create_bucket]))) {
-        (shouldCreate ? new Bucket(scope, `backup-bucket-${bucketName}`, {bucketName: bucketName})
-            : Bucket.fromBucketName(scope, `backup-bucket-${bucketName}`, bucketName)).grantPut(batchJobRole)
+        (shouldCreate ? new s3.Bucket(scope, `backup-bucket-${bucketName}`, {bucketName: bucketName})
+            : s3.Bucket.fromBucketName(scope, `backup-bucket-${bucketName}`, bucketName)).grantPut(batchJobRole)
     }
 
     for (let backup_def of config.backup_definitions) {
@@ -118,7 +117,7 @@ def handler(event, context): boto3.client("sns").publish(
                 enabled: true,
                 ruleName: `run-google-${backup_def.google_drive_folder}-backup-to-s3`,
                 schedule: Schedule.cron(backup_def.schedule),
-                targets: [new BatchJob(jobQueue.attrJobQueueArn, jobQueue, jobDefinition.ref, jobDefinition,
+                targets: [new targets.BatchJob(jobQueue.attrJobQueueArn, jobQueue, jobDefinition.ref, jobDefinition,
                     {jobName: `google-${backup_def.google_drive_folder}-backup-to-s3`}
                 )],
             });
@@ -133,17 +132,33 @@ export function bucket_name_from(s3_url: string) {
 }
 
 function createDefaultJobQueue(scope: Construct) {
+    let vpc = new ec2.Vpc(scope, "vpc", {
+        cidr: "10.0.0.0/16",
+        natGateways: 0,
+        subnetConfiguration: [
+            {
+                name: 'public',
+                cidrMask: 24,
+                subnetType: ec2.SubnetType.PUBLIC
+            }
+        ],
+        vpcName: "google-backup-vpc",
+    })
+    vpc.addInterfaceEndpoint("interface-endpoint-secrets-manager", {
+        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+    })
+
     return new batch.CfnJobQueue(scope, "default-job-queue", {
         jobQueueName: "default-job-queue",
         computeEnvironmentOrder: [{
-            computeEnvironment: new CfnComputeEnvironment(scope, "default-compute-env", {
+            computeEnvironment: new batch.CfnComputeEnvironment(scope, "default-compute-env", {
                 computeEnvironmentName: "default-compute-environment",
                 type: "MANAGED",
                 computeResources: {
                     type: "FARGATE",
                     maxvCpus: 256,
-                    subnets: ["subnet-09651f50fbbae3a34"],
-                    securityGroupIds: ["sg-0e7c9bcf25301a59b"],
+                    subnets: vpc.publicSubnets.map(s => s.subnetId),
+                    securityGroupIds: [vpc.vpcDefaultSecurityGroup],
                 },
                 serviceRole: `arn:aws:iam::${Stack.of(scope).account}:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`,
             }).attrComputeEnvironmentArn,
