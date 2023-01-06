@@ -25,7 +25,7 @@ jobs:
       with:
         rust-version: stable
     - name: Build Rust binary
-      run: cd rust && cargo build --release --bin back-up-drive-folder
+      run: cd rust && cargo build --release --bin back-up-drive-folder --target-dir target
     - uses: actions/upload-artifact@v3
       with:
         name: back-up-drive-folder
