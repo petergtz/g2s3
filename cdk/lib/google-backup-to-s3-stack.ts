@@ -39,7 +39,7 @@ export function createGoogleBackupToS3ResourcesIn(scope: Construct, config: Conf
             topic: snsTopic,
         })
     }
-    const lambda_to_forward_batch_completion = new lambda.Function(scope, 'lambda-forward-batch-completion-to-sns',
+    const lambdaToForwardBatchCompletion = new lambda.Function(scope, 'lambda-forward-batch-completion-to-sns',
         {
             functionName: "ForwardBatchCompletionStatusToSnS",
             runtime: lambda.Runtime.PYTHON_3_9,
@@ -52,7 +52,7 @@ def handler(event, context): boto3.client("sns").publish(
     Subject=f"AWS Batch job {event['detail']['jobName']} {event['detail']['status']}")`),
         });
 
-    snsTopic.grantPublish(lambda_to_forward_batch_completion);
+    snsTopic.grantPublish(lambdaToForwardBatchCompletion);
 
     const jobQueue = createDefaultJobQueue(scope);
     let batchJobRole = new iam.Role(scope, "google-takeout-backup-job-role", {
@@ -68,22 +68,22 @@ def handler(event, context): boto3.client("sns").publish(
     });
 
     for (let [bucketName, shouldCreate] of new Map(config.backup_definitions.map(
-        backup_def => [bucket_name_from(backup_def.s3_url), backup_def.should_create_bucket]))) {
+        backupDef => [bucketNameFrom(backupDef.s3_url), backupDef.should_create_bucket]))) {
         (shouldCreate ? new s3.Bucket(scope, `backup-bucket-${bucketName}`, {bucketName: bucketName})
             : s3.Bucket.fromBucketName(scope, `backup-bucket-${bucketName}`, bucketName)).grantPut(batchJobRole)
     }
 
-    for (let backup_def of config.backup_definitions) {
-        let command = ["/back-up-drive-folder", backup_def.google_drive_folder, backup_def.s3_url];
-        if (backup_def.storage_class) {
-            command.push("--s3-storage-class", backup_def.storage_class)
+    for (let backupDef of config.backup_definitions) {
+        let command = ["/back-up-drive-folder", backupDef.google_drive_folder, backupDef.s3_url];
+        if (backupDef.storage_class) {
+            command.push("--s3-storage-class", backupDef.storage_class)
         }
         const jobDefinition = new batch.CfnJobDefinition(
             scope,
-            `google-${backup_def.google_drive_folder}-backup-to-s3-job-def`,
+            `google-${backupDef.google_drive_folder}-backup-to-s3-job-def`,
             {
                 type: "container",
-                jobDefinitionName: `google-${backup_def.google_drive_folder}-backup-to-s3`,
+                jobDefinitionName: `google-${backupDef.google_drive_folder}-backup-to-s3`,
                 containerProperties: {
                     command: command,
                     image: "pego/google-backup-to-s3:latest",
@@ -94,7 +94,7 @@ def handler(event, context): boto3.client("sns").publish(
                         {type: "VCPU", value: "1"},
                         {type: "MEMORY", value: "2048"}
                     ],
-                    secrets: backup_def.google_secrets,
+                    secrets: backupDef.google_secrets,
                 },
                 platformCapabilities: ["FARGATE"],
             });
@@ -110,23 +110,23 @@ def handler(event, context): boto3.client("sns").publish(
             },
             enabled: true,
             ruleName: jobDefinition.jobDefinitionName + "-completed",
-            targets: [new targets.LambdaFunction(lambda_to_forward_batch_completion)],
+            targets: [new targets.LambdaFunction(lambdaToForwardBatchCompletion)],
         });
-        if (backup_def.schedule) {
-            new events.Rule(scope, `run-google-${backup_def.google_drive_folder}-backup-to-s3-event-rule`, {
+        if (backupDef.schedule) {
+            new events.Rule(scope, `run-google-${backupDef.google_drive_folder}-backup-to-s3-event-rule`, {
                 enabled: true,
-                ruleName: `run-google-${backup_def.google_drive_folder}-backup-to-s3`,
-                schedule: Schedule.cron(backup_def.schedule),
+                ruleName: `run-google-${backupDef.google_drive_folder}-backup-to-s3`,
+                schedule: Schedule.cron(backupDef.schedule),
                 targets: [new targets.BatchJob(jobQueue.attrJobQueueArn, jobQueue, jobDefinition.ref, jobDefinition,
-                    {jobName: `google-${backup_def.google_drive_folder}-backup-to-s3`}
+                    {jobName: `google-${backupDef.google_drive_folder}-backup-to-s3`}
                 )],
             });
         }
     }
 }
 
-export function bucket_name_from(s3_url: string) {
-    let u = new URL(s3_url);
+export function bucketNameFrom(s3Url: string) {
+    let u = new URL(s3Url);
     assert(u.protocol == "s3:");
     return u.hostname;
 }
