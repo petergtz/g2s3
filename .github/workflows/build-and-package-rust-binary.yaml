@@ -33,7 +33,7 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust/target/back-up-drive-folder
+        path: ./rust/target/release/back-up-drive-folder
 
   build-and-push-docker-image:
     runs-on: ubuntu-latest
@@ -43,7 +43,7 @@ jobs:
     - uses: actions/download-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust
+        path: ./rust/target/release
     - name: pwd
       run: pwd
     - name: ls
