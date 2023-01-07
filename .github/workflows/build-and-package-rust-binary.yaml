@@ -26,10 +26,14 @@ jobs:
         rust-version: stable
     - name: Build Rust binary
       run: cd rust && cargo build --release --bin back-up-drive-folder --target-dir target
+    - name: pwd
+      run: pwd
+    - name: ls
+      run: ls -R
     - uses: actions/upload-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust/target/
+        path: ./rust/target/back-up-drive-folder
 
   build-and-push-docker-image:
     runs-on: ubuntu-latest
@@ -39,7 +43,11 @@ jobs:
     - uses: actions/download-artifact@v3
       with:
         name: back-up-drive-folder
-        path: ./rust/target/
+        path: ./rust
+    - name: pwd
+      run: pwd
+    - name: ls
+      run: ls -R
 
     - name: Build and publish Docker Images to GitHub Container registry
       uses: VaultVulp/gp-docker-action@1.5.0
