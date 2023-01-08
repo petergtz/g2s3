@@ -40,6 +40,8 @@ jobs:
       with:
         name: back-up-drive-folder
         path: ./rust/target/release
+    - name: Make binary executable again
+      run: chmod 755 ./rust/target/release/back-up-drive-folder
 
     - name: Build and publish Docker Images to GitHub Container registry
       uses: VaultVulp/gp-docker-action@1.5.0
