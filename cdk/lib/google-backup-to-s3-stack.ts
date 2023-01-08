@@ -86,7 +86,7 @@ def handler(event, context): boto3.client("sns").publish(
                 jobDefinitionName: `google-${backupDef.google_drive_folder}-backup-to-s3`,
                 containerProperties: {
                     command: command,
-                    image: "pego/google-backup-to-s3:latest",
+                    image: "ghcr.io/petergtz/g2s3/g2s3:latest",
                     jobRoleArn: batchJobRole.roleArn,
                     executionRoleArn: batchJobExecutionRole.roleArn,
                     networkConfiguration: {assignPublicIp: "ENABLED",},
