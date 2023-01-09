@@ -17,6 +17,7 @@ import SecretProperty = CfnJobDefinition.SecretProperty;
 interface Config {
     backup_definitions: BackupDefinition[];
     email?: string,
+    image?: string,
 }
 
 interface BackupDefinition {
@@ -32,6 +33,9 @@ export function createGoogleBackupToS3ResourcesIn(scope: Construct, config: Conf
     const snsTopic = new sns.Topic(scope, "GoogleBackupToS3", {
         topicName: "GoogleBackupToS3",
     })
+    if (!config.image) {
+        config.image = "ghcr.io/petergtz/g2s3/g2s3:latest"
+    }
     if (config.email) {
         new sns.Subscription(scope, "GoogleBackupToS3-SnsSubscription", {
             protocol: SubscriptionProtocol.EMAIL,
@@ -86,7 +90,7 @@ def handler(event, context): boto3.client("sns").publish(
                 jobDefinitionName: `google-${backupDef.google_drive_folder}-backup-to-s3`,
                 containerProperties: {
                     command: command,
-                    image: "ghcr.io/petergtz/g2s3/g2s3:latest",
+                    image: config.image,
                     jobRoleArn: batchJobRole.roleArn,
                     executionRoleArn: batchJobExecutionRole.roleArn,
                     networkConfiguration: {assignPublicIp: "ENABLED",},
