@@ -1,0 +1,33 @@
+{
+  "email": "your.email@example.com",
+  "image": "ghcr.io/<YOUR_GITHUB_USERNAME>/g2s3/g2s3:latest OR REMOVE LINE TO USE DEFAULT",
+  "backup_definitions": [
+    {
+      "s3_url": "s3://<MY_PERSONAL_BUCKET>/{date}/<GOOGLE_DRIVE_FOLDER>",
+      "should_create_bucket": false,
+      "storage_class": "DEEP_ARCHIVE",
+      "google_drive_folder": "<GOOGLE_DRIVE_FOLDER>",
+      "google_secrets": [
+        {
+          "name": "CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:<SECRET_NAME>:CLIENT_ID::"
+        },
+        {
+          "name": "CLIENT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:<SECRET_NAME>:CLIENT_SECRET::"
+        },
+        {
+          "name": "REFRESH_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:<SECRET_NAME>:REFRESH_TOKEN::"
+        }
+      ],
+      "schedule": {
+        "minute": "0",
+        "hour": "0",
+        "day": "1",
+        "month": "*/4",
+        "year": "*"
+      }
+    }
+  ]
+}

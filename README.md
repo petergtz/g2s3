@@ -13,6 +13,47 @@ What's working:
 What's not working yet:
 - Recursive copy of a Google Drive folder, or entire Google Drive into S3.
 
+## "Quick" Start Guide
+
+1. In [Google Cloud Platform (GCP)](https://console.cloud.google.com/):
+   1. create a new project (e.g. "g2s3")
+   2. enable the [Google Drive API](https://console.cloud.google.com/apis/api/drive.googleapis.com)
+   3. [create a OAuth 2.0 consent screen](https://console.cloud.google.com/apis/credentials/consent).
+   4. Download credentials (TODO: add how)
+2. Build and run the `retrieve-google-tokens` binary (TODO: add instructions)
+3. In [your AWS account](https://console.aws.amazon.com/)
+   1. "Store a new secret" in
+      [AWS Secrets Manager](https://eu-west-1.console.aws.amazon.com/secretsmanager/listsecrets)
+   ("Other type of secret")
+   3. Add `CLIENT_ID`, `CLIENT_SECRET`, and `REFRESH_TOKEN` into new secret as key/value pairs
+4. Choose **one** of the following two options:
+   - Option 1: Using a personal fork and your own Docker image:
+      1. On GitHub, [fork this repository](https://github.com/petergtz/g2s3/fork), and enable
+      GitHub Actions in your forked repository.
+      2. In your terminal, run:
+
+             git clone git@github.com:<GITHUB_USER>/g2s3.git
+             cd g2s3
+
+   - Option 2: Using `petergtz` repo and the associated Docker image:
+        1. In your terminal, run:
+
+               git clone https://github.com/petergtz/g2s3.git
+               cd g2s3
+
+5. To configure your backup setup:
+   1. In your terminal, run:
+
+          mv cdk/bin/deployment-config.json.example cdk/bin/deployment-config.json
+
+   2. Fill in proper values in `cdk/bin/deployment-config.json` (hopefully self-explanatory)
+6. Assuming `aws` CLI is installed and configured correctly, run:
+
+       ./scripts/cdk-deploy.sh
+
+## Architecture Diagram
+
+TODO
 
 ## Components
 
@@ -52,14 +93,3 @@ $ ./scripts/build-release.sh && ./scripts/build-container.sh
 ### CDK Stack
 
 The CDK stack can be found in `./cdk/lib`.
-
-## Getting Started
-
-### Google Cloud setup
-TODO: Describe what needs to be created in Google Cloud
-
-### AWS Setup
-TODO: Describe what needs to be created in AWS
-
-### Configuring and invoking CDK
-TODO: Describe configuration step
