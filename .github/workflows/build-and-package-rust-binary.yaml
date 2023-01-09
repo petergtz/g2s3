@@ -3,6 +3,7 @@ name: Build and package Rust binary
 on:
   push:
     branches: [ main ]
+    paths: [ 'rust/**' ]
 
 jobs:
   build-release:
