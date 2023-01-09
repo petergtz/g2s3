@@ -11,21 +11,16 @@ What's working:
 - CDK deploys AWS Batch jobs, necessary compute environment, queues, SNS topics, subscriptions, etc.
 
 What's not working yet:
-- No GitHub actions to automatically build and push container image
-- CDK does not create security groups, subnets, job roles, or execution roles yet. These need to be created manually and referred to.
-
-So while this can be used, it requires some manual effort.
+- Recursive copy of a Google Drive folder, or entire Google Drive into S3.
 
 
 ## Components
 
 G2S3 consists of three main components:
-- a binary built with Rust to copy files from Google Drive to S3, called `back-up-drive-folder`
-- a Docker container built from a Dockerfile to package `back-up-drive-folder` into an image
-(currently available as
-[pego/google-backup-to-s3](https://hub.docker.com/repository/docker/pego/google-backup-to-s3) on
-Docker Hub)
-- a CDK stack to deploy everything as AWS Batch job to regularly invoke `back-up-drive-folder`
+- a **binary** built with Rust to copy files from Google Drive to S3, called `back-up-drive-folder`
+- a **Docker image** built from a Dockerfile to package `back-up-drive-folder`, available as GitHub
+[Package g2s3/g2s3](https://github.com/petergtz/g2s3/pkgs/container/g2s3%2Fg2s3).
+- a **CDK stack** to deploy everything as AWS Batch job to regularly invoke `back-up-drive-folder`
 
 ### CLI `back-up-drive-folder`
 
@@ -36,16 +31,23 @@ For instructions, on how to use it:
 $ back-up-drive-folder --help
 ```
 
-### Docker container
+### Docker Image
 
-The Docker container can be used directly from [pego/google-backup-to-s3](https://hub.docker.com/repository/docker/pego/google-backup-to-s3). Or it can be built, using:
+
+The [Docker image](https://github.com/petergtz/g2s3/pkgs/container/g2s3%2Fg2s3) (built via
+[this GitHub Action](
+https://github.com/petergtz/g2s3/blob/main/.github/workflows/build-and-package-rust-binary.yaml))
+can be used directly using:
+
+```shell
+$ docker pull ghcr.io/petergtz/g2s3/g2s3:latest
+```
+
+Or it can be built using:
 
 ```shell
 $ ./scripts/build-release.sh && ./scripts/build-container.sh
 ```
-
-In the future, this container will be built as part of a GitHub action and also hosted in GitHub's
-registry.
 
 ### CDK Stack
 
