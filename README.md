@@ -44,7 +44,7 @@ What's not working yet:
 5. To configure your backup setup:
    1. In your terminal, run:
 
-          mv cdk/bin/deployment-config.json.example cdk/bin/deployment-config.json
+          cp cdk/bin/deployment-config.json.example cdk/bin/deployment-config.json
 
    2. Fill in proper values in `cdk/bin/deployment-config.json` (hopefully self-explanatory)
 6. Assuming `aws` CLI is installed and configured correctly, run:
