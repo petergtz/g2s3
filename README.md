@@ -53,7 +53,7 @@ What's not working yet:
 
 ## Architecture Diagram
 
-TODO
+![Architecture](architecture.png "Architecture")
 
 ## Components
 
