@@ -13,6 +13,11 @@ What's working:
 What's not working yet:
 - Recursive copy of a Google Drive folder, or entire Google Drive into S3.
 
+There's also an accompanying blog post:
+- [**Backing Up Google Photos to Amazon S3**](
+  https://medium.com/better-programming/backing-up-google-photos-to-amazon-s3-221e42a32a95)
+  published in [Better Programming](https://betterprogramming.pub/)
+
 ## "Quick" Start Guide
 
 1. In [Google Cloud Platform (GCP)](https://console.cloud.google.com/):
@@ -28,8 +33,8 @@ What's not working yet:
    3. Add `CLIENT_ID`, `CLIENT_SECRET`, and `REFRESH_TOKEN` into new secret as key/value pairs
 4. Choose **one** of the following two options:
    - Option 1: Using a personal fork and your own Docker image:
-      1. On GitHub, [fork this repository](https://github.com/petergtz/g2s3/fork), and enable
-      GitHub Actions in your forked repository.
+      1. On GitHub, [fork this repository](https://github.com/petergtz/g2s3/fork), enable
+      GitHub Actions in your forked repository, and wait for the Action to successfully complete.
       2. In your terminal, run:
 
              git clone git@github.com:<GITHUB_USER>/g2s3.git
