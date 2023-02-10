@@ -148,9 +148,6 @@ function createDefaultJobQueue(scope: Construct) {
         ],
         vpcName: "google-backup-vpc",
     })
-    vpc.addInterfaceEndpoint("interface-endpoint-secrets-manager", {
-        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-    })
 
     return new batch.CfnJobQueue(scope, "default-job-queue", {
         jobQueueName: "default-job-queue",
