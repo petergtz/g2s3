@@ -4,6 +4,11 @@
 
 G2S3 is a solution to regularly back up your Google data by copying it over to S3.
 
+--------
+**_!!! Interested in a ready-to-use hosted version of this? Please >> [sign up here](https://g2s3.pro/) << !!!_**
+
+-------
+
 **This is work in progress.**
 
 What's working:
