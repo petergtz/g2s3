@@ -4,9 +4,10 @@ use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use aws_sdk_s3::Client;
-use aws_smithy_http::{body::SdkBody, byte_stream::ByteStream};
+use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart, StorageClass};
 use byte_unit::{Byte, ByteUnit::B};
 use futures::{stream, StreamExt};
+use google_drive3::hyper::body::HttpBody;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use url::Url;
@@ -53,19 +54,30 @@ pub async fn back_up(
     result
 }
 
-trait Run
-where
-    Self: Sized,
-{
-    fn run<F, R>(self, func: F) -> R
-    where
-        F: FnOnce(Self) -> R,
-    {
-        func(self)
-    }
-}
+async fn upload_part(
+    s3: &Client,
+    bucket: &str,
+    key: &str,
+    upload_id: &str,
+    part_number: i32,
+    data: Vec<u8>,
+) -> Result<CompletedPart> {
+    let resp = s3
+        .upload_part()
+        .bucket(bucket)
+        .key(key)
+        .upload_id(upload_id)
+        .part_number(part_number)
+        .body(aws_sdk_s3::primitives::ByteStream::from(data))
+        .send()
+        .await
+        .chain_err(|| format!("upload_part failed for part {part_number}"))?;
 
-impl<T> Run for T where T: Sized {}
+    Ok(CompletedPart::builder()
+        .part_number(part_number)
+        .e_tag(resp.e_tag().unwrap_or_default())
+        .build())
+}
 
 async fn copy_file(
     drive: &Drive,
@@ -80,19 +92,82 @@ async fn copy_file(
 
     let (bucket_name, folder_name) =
         parse_s3_url(destination).chain_err(|| format!("Could not parse S3 URL {destination}."))?;
-    s3.put_object()
-        .bucket(bucket_name)
-        .key(folder_name.join(filename).to_str().unwrap())
-        .run(|r| match file.md5_checksum.as_ref() {
-            Some(md5_checksum) => r.content_md5(base64::encode(hex::decode(md5_checksum).unwrap())),
-            None => r,
-        })
-        // .content_md5(base64::encode(hex::decode(file.md5_checksum.as_ref().unwrap()).unwrap()))
-        .body(ByteStream::new(SdkBody::from(drive.get_content_for(&file).await?.into_body())))
-        .storage_class(storage_class.into())
+    let key = folder_name.join(filename).to_str().unwrap().to_string();
+    let sc: StorageClass = storage_class.into();
+
+    let response = drive.get_content_for(&file).await?;
+    let mut body = response.into_body();
+
+    // Use multipart upload: stream in chunks of 64MB
+    const PART_SIZE: usize = 64 * 1024 * 1024;
+
+    let create_resp = s3
+        .create_multipart_upload()
+        .bucket(&bucket_name)
+        .key(&key)
+        .storage_class(sc)
         .send()
         .await
-        .chain_err(|| format!("Could not upload file contents for {filename}"))?;
+        .chain_err(|| format!("Could not create multipart upload for {filename}"))?;
+
+    let upload_id = create_resp.upload_id().unwrap().to_string();
+    let mut parts: Vec<CompletedPart> = Vec::new();
+    let mut part_number: i32 = 1;
+    let mut buf = Vec::with_capacity(PART_SIZE);
+
+    loop {
+        match body.data().await {
+            Some(Ok(chunk)) => {
+                buf.extend_from_slice(&chunk);
+                if buf.len() >= PART_SIZE {
+                    let part = upload_part(s3, &bucket_name, &key, &upload_id, part_number, std::mem::replace(&mut buf, Vec::with_capacity(PART_SIZE))).await;
+                    if let Err(e) = part {
+                        let _ = s3.abort_multipart_upload()
+                            .bucket(&bucket_name).key(&key).upload_id(&upload_id)
+                            .send().await;
+                        return Err(e).chain_err(|| format!("Could not upload part {part_number} for {filename}"));
+                    }
+                    parts.push(part.unwrap());
+                    part_number += 1;
+                }
+            }
+            Some(Err(e)) => {
+                let _ = s3.abort_multipart_upload()
+                    .bucket(&bucket_name).key(&key).upload_id(&upload_id)
+                    .send().await;
+                return Err(errors::Error::from(format!("Download error for {filename}: {e}")));
+            }
+            None => break,
+        }
+    }
+
+    // Upload remaining data
+    if !buf.is_empty() || parts.is_empty() {
+        let part = upload_part(s3, &bucket_name, &key, &upload_id, part_number, buf).await;
+        if let Err(e) = part {
+            let _ = s3.abort_multipart_upload()
+                .bucket(&bucket_name).key(&key).upload_id(&upload_id)
+                .send().await;
+            return Err(e).chain_err(|| format!("Could not upload final part for {filename}"));
+        }
+        parts.push(part.unwrap());
+    }
+
+    // Complete the multipart upload
+    s3.complete_multipart_upload()
+        .bucket(&bucket_name)
+        .key(&key)
+        .upload_id(&upload_id)
+        .multipart_upload(
+            CompletedMultipartUpload::builder()
+                .set_parts(Some(parts))
+                .build(),
+        )
+        .send()
+        .await
+        .chain_err(|| format!("Could not complete multipart upload for {filename}"))?;
+
+    log::info!("Uploaded {filename} in {} parts", part_number);
 
     if let Some(filesize) = file.size.as_ref() {
         let filesize = Byte::from_str(filesize).unwrap();
