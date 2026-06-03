@@ -10,9 +10,9 @@ jobs:
   build-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: ⚡ Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/
@@ -23,12 +23,10 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Set up Rust
-      uses: ATiltedTree/setup-rust@v1.0.5
-      with:
-        rust-version: stable
+      uses: dtolnay/rust-toolchain@stable
     - name: Build Rust binary
       run: cd rust && cargo build --release --bin back-up-drive-folder --target-dir target
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: back-up-drive-folder
         path: ./rust/target/release/back-up-drive-folder
@@ -37,8 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-release
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/download-artifact@v3
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
       with:
         name: back-up-drive-folder
         path: ./rust/target/release
