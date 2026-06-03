@@ -52,7 +52,7 @@ fn main() {
     .set_auth_type(AuthType::RequestBody);
     let (auth_url, csrf_token) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("https://www.googleapis.com/auth/photoslibrary.readonly".to_string()))
+//        .add_scope(Scope::new("https://www.googleapis.com/auth/photoslibrary.readonly".to_string()))
         .add_scope(Scope::new("https://www.googleapis.com/auth/drive.readonly".to_string()))
         .add_extra_param("access_type", "offline")
         .add_extra_param("include_granted_scopes", "true")

@@ -1,7 +1,7 @@
 extern crate core;
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use aws_sdk_s3::Client;
 use aws_smithy_http::{body::SdkBody, byte_stream::ByteStream};
@@ -103,6 +103,32 @@ async fn copy_file(
             Byte::from_unit(filesize.get_bytes() as f64 / start_time.elapsed().as_secs_f64(), B)
                 .unwrap()
                 .get_appropriate_unit(false)
+        );
+
+        println!(
+            "{}",
+            format!(
+                r#"{{
+                "_aws": {{
+                    "Timestamp": "{}",
+                    "CloudWatchMetrics": [
+                    {{
+                        "Namespace": "google-backup",
+                        "Metrics": [
+                        {{
+                            "Name": "copy_duration",
+                            "Unit": "Milliseconds"
+                        }}
+                        ]
+                    }}
+                    ]
+                }},
+                "copy_duration": "{}",
+            }}"#,
+                SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string(),
+                start_time.elapsed().as_millis()
+            )
+            .replace("\n", "")
         );
     } else {
         log::info!("Throughput for file {filename} unknown due to unknown size");
