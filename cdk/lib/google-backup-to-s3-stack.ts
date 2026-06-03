@@ -1,12 +1,12 @@
-import {aws_events as events, aws_sns as sns, Stack} from 'aws-cdk-lib';
+import {Stack} from 'aws-cdk-lib';
+import * as sns from 'aws-cdk-lib/aws-sns'
+import * as events from 'aws-cdk-lib/aws-events'
 import {Construct} from 'constructs';
-import {Schedule} from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as batch from 'aws-cdk-lib/aws-batch';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from "aws-cdk-lib/aws-s3";
-import {CronOptions} from "aws-cdk-lib/aws-events/lib/schedule";
-import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
+import * as schedule from "aws-cdk-lib/aws-events/lib/schedule";
 import {CfnJobDefinition} from "aws-cdk-lib/aws-batch/lib/batch.generated";
 import {URL} from "url";
 import assert from "assert";
@@ -26,7 +26,7 @@ interface BackupDefinition {
     s3_url: string,
     should_create_bucket: boolean,
     storage_class?: string,
-    schedule?: CronOptions;
+    schedule?: schedule.CronOptions;
 }
 
 export function createGoogleBackupToS3ResourcesIn(scope: Construct, config: Config) {
@@ -38,7 +38,7 @@ export function createGoogleBackupToS3ResourcesIn(scope: Construct, config: Conf
     }
     if (config.email) {
         new sns.Subscription(scope, "GoogleBackupToS3-SnsSubscription", {
-            protocol: SubscriptionProtocol.EMAIL,
+            protocol: sns.SubscriptionProtocol.EMAIL,
             endpoint: config.email,
             topic: snsTopic,
         })
@@ -120,7 +120,7 @@ def handler(event, context): boto3.client("sns").publish(
             new events.Rule(scope, `run-google-${backupDef.google_drive_folder}-backup-to-s3-event-rule`, {
                 enabled: true,
                 ruleName: `run-google-${backupDef.google_drive_folder}-backup-to-s3`,
-                schedule: Schedule.cron(backupDef.schedule),
+                schedule: events.Schedule.cron(backupDef.schedule),
                 targets: [new targets.BatchJob(jobQueue.attrJobQueueArn, jobQueue, jobDefinition.ref, jobDefinition,
                     {jobName: `google-${backupDef.google_drive_folder}-backup-to-s3`}
                 )],
