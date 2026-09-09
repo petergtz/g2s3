@@ -2,3 +2,6 @@
 .DS_Store
 .idea/
 cdk/node_modules/
+
+# Parked/unused source
+attic/
